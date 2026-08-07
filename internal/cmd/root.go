@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
@@ -12,10 +13,13 @@ import (
 )
 
 var (
-	cfgFile string
-	RootCmd = &cobra.Command{
-		Use:  "cloud189",
-		Long: "cloud189 enables users to manage cloud files through the command line. For more information, please visit https://github.com/gowsp/cloud189",
+	cfgFile    string
+	jsonOutput bool
+	RootCmd    = &cobra.Command{
+		Use:           "cloud189",
+		Long:          "cloud189 enables users to manage cloud files through the command line. For more information, please visit https://github.com/gowsp/cloud189",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 )
 
@@ -24,12 +28,18 @@ func AddCommand(cmds ...*cobra.Command) {
 }
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
+		if jsonOutput {
+			_ = writeJSONError(err)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
 		os.Exit(1)
 	}
 }
 
 func init() {
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/cloud189/config.json)")
+	RootCmd.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "print machine-readable json to stdout")
 
 	RootCmd.AddCommand(loginCmd)
 	RootCmd.AddCommand(qrLoginCmd)
@@ -39,6 +49,7 @@ func init() {
 	RootCmd.AddCommand(rmCmd)
 	RootCmd.AddCommand(dlCmd)
 	RootCmd.AddCommand(lsCmd)
+	RootCmd.AddCommand(statCmd)
 	RootCmd.AddCommand(mkdirCmd)
 	RootCmd.AddCommand(mvCmd)
 	RootCmd.AddCommand(cpCmd)
