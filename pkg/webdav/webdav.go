@@ -2,7 +2,6 @@ package webdav
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/gowsp/cloud189/pkg"
@@ -11,7 +10,7 @@ import (
 
 var errInvalidIfHeader = errors.New("webdav: invalid If header")
 
-func Serve(addr string, client pkg.Drive) {
+func Serve(addr string, client pkg.Drive) error {
 	fs := &CloudFileSystem{
 		app: client,
 	}
@@ -19,9 +18,5 @@ func Serve(addr string, client pkg.Drive) {
 		FileSystem: fs,
 		LockSystem: webdav.NewMemLS(),
 	}
-	err := http.ListenAndServe(addr, fs)
-	if err != nil {
-		fmt.Println(err)
-	}
-
+	return http.ListenAndServe(addr, fs)
 }

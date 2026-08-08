@@ -18,37 +18,36 @@ var loginCmd = &cobra.Command{
 		}
 		return nil
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if usePwd {
-			loginFunc(args[0], args[1])
-			return
+			return loginFunc(args[0], args[1])
 		}
 		line := liner.NewLiner()
 		defer line.Close()
 		username, _ := line.Prompt("username: ")
 		password, _ := line.PasswordPrompt("password: ")
-		loginFunc(username, password)
+		return loginFunc(username, password)
 	},
 }
 
 var qrLoginCmd = &cobra.Command{
 	Use:   "qrlogin",
 	Short: "qrlogin cloud189",
-	Run: func(cmd *cobra.Command, args []string) {
-	if err := App().QrLogin(); err != nil {
-		fmt.Printf("\n%s\n", err)
-		return
-	}
-	fmt.Println("login success")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := App().QrLogin(); err != nil {
+			return err
+		}
+		fmt.Println("login success")
+		return nil
 	},
 }
 
-func loginFunc(username, password string) {
+func loginFunc(username, password string) error {
 	if err := App().Login(username, password); err != nil {
-		fmt.Printf("\n%s\n", err)
-		return
+		return err
 	}
 	fmt.Println("login success")
+	return nil
 }
 
 func init() {

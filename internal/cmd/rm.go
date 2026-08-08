@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/gowsp/cloud189/internal/session"
 	"github.com/gowsp/cloud189/pkg/file"
 	"github.com/spf13/cobra"
@@ -13,14 +11,10 @@ var rmCmd = &cobra.Command{
 	Short:  "remove file",
 	PreRun: session.Parse,
 	Args:   cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		err := file.CheckPath(args...)
-		if err != nil {
-			fmt.Println(err)
-			return
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := file.CheckPath(args...); err != nil {
+			return err
 		}
-		if err := App().Delete(args...); err != nil {
-			fmt.Println(err)
-		}
+		return App().Delete(args...)
 	},
 }
