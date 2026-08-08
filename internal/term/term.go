@@ -31,6 +31,7 @@ func Start() {
 	for {
 		if args, err := line.Prompt(fmt.Sprintf("[cloud189 %s]$ ", session.Base())); err == nil {
 			root.SetArgs(strings.Split(args, " "))
+			cmd.ResetTermFlags()
 			if root.Execute() == liner.ErrPromptAborted {
 				break
 			}

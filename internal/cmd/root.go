@@ -26,6 +26,15 @@ var (
 func AddCommand(cmds ...*cobra.Command) {
 	RootCmd.AddCommand(cmds...)
 }
+
+func ResetTermFlags() {
+	jsonOutput = false
+	recursiveList = false
+	dlOutput = ""
+	upInput = ""
+	upRemotePath = ""
+}
+
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		if jsonOutput {
