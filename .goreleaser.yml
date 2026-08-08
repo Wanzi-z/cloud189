@@ -1,15 +1,18 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
+version: 2
+
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
     - go generate ./...
+
 builds:
   - main: ./cmd/cloud189
     id: "cloud189"
     binary: cloud189
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.date={{.Date}}
     goos:
       - linux
       - darwin
@@ -33,19 +36,21 @@ archives:
     files:
       - LICENSE
       - README.md
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
     exclude:
       - '^docs:'
       - '^test:'
+
 release:
-  # Repo in which the release will be created.
-  # Default is extracted from the origin remote URL or empty if its private hosted.
   github:
     owner: gowsp
     name: cloud189
