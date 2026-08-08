@@ -8,7 +8,7 @@ import (
 
 var cpCmd = &cobra.Command{
 	Use:    "cp",
-	Short:  "copy file",
+	Short:  "复制文件",
 	PreRun: session.Parse,
 	Args:   cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

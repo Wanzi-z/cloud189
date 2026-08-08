@@ -8,7 +8,7 @@ import (
 
 var mkdirCmd = &cobra.Command{
 	Use:    "mkdir",
-	Short:  "mkdir on remote",
+	Short:  "创建目录",
 	PreRun: session.Parse,
 	Args:   cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -9,7 +9,7 @@ import (
 
 var shareCmd = &cobra.Command{
 	Use:   "share",
-	Short: "file direct link sharing",
+	Short: "文件直链分享",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		handler, err := App().Share("/", args[1])
@@ -18,7 +18,7 @@ var shareCmd = &cobra.Command{
 		}
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", handler)
-		log.Println("start share serve at", args[0])
+		log.Println("启动分享服务于", args[0])
 		return http.ListenAndServe(args[0], mux)
 	},
 }

@@ -11,7 +11,7 @@ var usePwd bool
 
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "login cloud189",
+	Short: "登录天翼云盘",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if usePwd && len(args) < 2 {
 			return fmt.Errorf("requires username password parameter, received %d", len(args))
@@ -24,20 +24,20 @@ var loginCmd = &cobra.Command{
 		}
 		line := liner.NewLiner()
 		defer line.Close()
-		username, _ := line.Prompt("username: ")
-		password, _ := line.PasswordPrompt("password: ")
+		username, _ := line.Prompt("用户名: ")
+		password, _ := line.PasswordPrompt("密码: ")
 		return loginFunc(username, password)
 	},
 }
 
 var qrLoginCmd = &cobra.Command{
 	Use:   "qrlogin",
-	Short: "qrlogin cloud189",
+	Short: "扫码登录天翼云盘",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := App().QrLogin(); err != nil {
 			return err
 		}
-		fmt.Println("login success")
+		fmt.Println("登录成功")
 		return nil
 	},
 }
@@ -46,10 +46,10 @@ func loginFunc(username, password string) error {
 	if err := App().Login(username, password); err != nil {
 		return err
 	}
-	fmt.Println("login success")
+	fmt.Println("登录成功")
 	return nil
 }
 
 func init() {
-	loginCmd.Flags().BoolVarP(&usePwd, "i", "i", false, "input username and password to login")
+	loginCmd.Flags().BoolVarP(&usePwd, "i", "i", false, "通过输入用户名和密码登录")
 }

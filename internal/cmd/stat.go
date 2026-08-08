@@ -12,7 +12,7 @@ import (
 
 var statCmd = &cobra.Command{
 	Use:    "stat [path]",
-	Short:  "show file metadata",
+	Short:  "查看文件信息",
 	PreRun: session.Parse,
 	Args:   cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

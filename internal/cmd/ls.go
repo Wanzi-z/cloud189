@@ -13,7 +13,7 @@ import (
 var recursiveList bool
 
 func init() {
-	lsCmd.Flags().BoolVarP(&recursiveList, "recursive", "r", false, "list recursively")
+	lsCmd.Flags().BoolVarP(&recursiveList, "recursive", "R", false, "递归列出")
 }
 
 type dirReader interface {
@@ -23,7 +23,7 @@ type dirReader interface {
 var lsCmd = &cobra.Command{
 	Use:    "ls [path]",
 	PreRun: session.Parse,
-	Short:  "list file",
+	Short:  "列出文件",
 	Args:   cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := file.CheckPath(args...)

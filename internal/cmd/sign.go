@@ -8,7 +8,7 @@ import (
 
 var signCmd = &cobra.Command{
 	Use:   "sign",
-	Short: "sign",
+	Short: "每日签到",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if cfgFile == "" {
 			cfgFile = invoker.DefaultPath()

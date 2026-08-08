@@ -10,7 +10,7 @@ import (
 
 var duCmd = &cobra.Command{
 	Use:    "du",
-	Short:  "show file usage statistics",
+	Short:  "显示文件占用统计",
 	PreRun: session.Parse,
 	Args:   cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -36,7 +36,7 @@ var duCmd = &cobra.Command{
 				return err
 			}
 
-			fmt.Printf("%-10s %-10s %-10s %s\n", "FILES", "FOLDERS", "SIZE", "NAME")
+			fmt.Printf("%-10s %-10s %-10s %s\n", "文件数", "目录数", "大小", "名称")
 
 			totalFiles := uint64(0)
 			totalSize := uint64(0)
@@ -60,14 +60,14 @@ var duCmd = &cobra.Command{
 				totalFolders += usage.FolderCount()
 			}
 
-			fmt.Printf("%-10d %-10d %-10s %s\n", totalFiles, totalFolders, file.ReadableSize(totalSize), "Total")
+			fmt.Printf("%-10d %-10d %-10s %s\n", totalFiles, totalFolders, file.ReadableSize(totalSize), "合计")
 		} else {
 			usage, err := App().Usage(path)
 			if err != nil {
 				return err
 			}
 
-			fmt.Printf("%-10s %-10s %-10s %s\n", "FILES", "FOLDERS", "SIZE", "NAME")
+			fmt.Printf("%-10s %-10s %-10s %s\n", "文件数", "目录数", "大小", "名称")
 			fmt.Printf("%-10d %-10d %-10s %s\n",
 				usage.FileCount(),
 				usage.FolderCount(),

@@ -17,7 +17,7 @@ var (
 	jsonOutput bool
 	RootCmd    = &cobra.Command{
 		Use:           "cloud189",
-		Long:          "cloud189 enables users to manage cloud files through the command line. For more information, please visit https://github.com/gowsp/cloud189",
+		Long:          "cloud189 是一个基于天翼云接口的命令行客户端。详情请访问 https://github.com/gowsp/cloud189",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -47,8 +47,8 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/cloud189/config.json)")
-	RootCmd.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "print machine-readable json to stdout")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "指定配置文件路径（默认为 $HOME/.config/cloud189/config.json）")
+	RootCmd.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "以 JSON 格式输出结果")
 
 	RootCmd.AddCommand(loginCmd)
 	RootCmd.AddCommand(qrLoginCmd)

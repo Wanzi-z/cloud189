@@ -8,7 +8,7 @@ import (
 
 var mvCmd = &cobra.Command{
 	Use:    "mv",
-	Short:  "move file",
+	Short:  "移动文件",
 	PreRun: session.Parse,
 	Args:   cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

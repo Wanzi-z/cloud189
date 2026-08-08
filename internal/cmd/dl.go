@@ -12,12 +12,12 @@ import (
 var dlOutput string
 
 func init() {
-	dlCmd.Flags().StringVarP(&dlOutput, "output", "o", "", "local output file path for machine-mode download")
+	dlCmd.Flags().StringVarP(&dlOutput, "output", "o", "", "下载到指定的本地路径")
 }
 
 var dlCmd = &cobra.Command{
 	Use:   "dl",
-	Short: "download file",
+	Short: "下载文件",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if jsonOutput || dlOutput != "" {

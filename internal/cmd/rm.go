@@ -8,7 +8,7 @@ import (
 
 var rmCmd = &cobra.Command{
 	Use:    "rm",
-	Short:  "remove file",
+	Short:  "删除文件",
 	PreRun: session.Parse,
 	Args:   cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

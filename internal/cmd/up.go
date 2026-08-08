@@ -14,16 +14,16 @@ var upInput string
 var upRemotePath string
 
 func init() {
-	upCmd.Flags().Uint32VarP(&upCfg.Num, "parallel", "p", 5, "number of parallels for file upload")
-	upCmd.Flags().StringVarP(&upCfg.Parten, "name", "n", "", "filter filename regular expression")
-	upCmd.Flags().StringVar(&upInput, "input", "", "local input file path for machine-mode upload")
-	upCmd.Flags().StringVar(&upRemotePath, "path", "", "full remote file path for machine-mode upload")
-	upCmd.Flags().StringVar(&upCfg.Policy, "policy", "skip", "upload policy for machine-mode upload: skip or overwrite")
+	upCmd.Flags().Uint32VarP(&upCfg.Num, "parallel", "p", 5, "并发上传数量")
+	upCmd.Flags().StringVarP(&upCfg.Parten, "name", "n", "", "过滤文件名的正则表达式")
+	upCmd.Flags().StringVar(&upInput, "input", "", "要上传的本地文件路径")
+	upCmd.Flags().StringVar(&upRemotePath, "path", "", "上传到的云盘文件路径")
+	upCmd.Flags().StringVar(&upCfg.Policy, "policy", "skip", "同名文件处理策略: skip 跳过 或 overwrite 覆盖")
 }
 
 var upCmd = &cobra.Command{
 	Use:   "up",
-	Short: "upload file",
+	Short: "上传文件",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if jsonOutput || upInput != "" || upRemotePath != "" {
 			if len(args) != 0 {

@@ -9,7 +9,7 @@ import (
 
 var dfCmd = &cobra.Command{
 	Use:   "df",
-	Short: "show information about the space used",
+	Short: "显示空间使用情况",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		space, err := App().Space()
 		if err != nil {

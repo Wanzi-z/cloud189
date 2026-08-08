@@ -11,9 +11,9 @@ var version string
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the version",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Release Date: %s\n", date)
-		fmt.Printf("Version: %s\n", version)
-	},
+		Short: "打印版本信息",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("构建时间: %s\n", date)
+			fmt.Printf("版本: %s\n", version)
+		},
 }
