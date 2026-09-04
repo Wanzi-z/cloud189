@@ -12,11 +12,15 @@ var mkdirCmd = &cobra.Command{
 	PreRun: session.Parse,
 	Args:   cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := file.CheckPath(args...); err != nil {
-			return err
-		}
 		for _, arg := range args {
-			if err := App().Mkdir(arg); err != nil {
+			client, location, err := resolveCloudPath(arg)
+			if err != nil {
+				return err
+			}
+			if err := file.CheckPath(location.path); err != nil {
+				return err
+			}
+			if err := client.Mkdir(cmd.Context(), location.name(), 0755); err != nil {
 				return err
 			}
 		}

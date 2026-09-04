@@ -38,7 +38,11 @@ func completer(line string) (c []string) {
 	arg := args[len-1]
 	dir, n := path.Split(arg)
 	name := session.Join(dir)
-	files, err := cmd.App().ReadDir(name)
+	drive, cloudPath, err := cmd.ResolveCloudPath(name)
+	if err != nil {
+		return
+	}
+	files, err := drive.ReadDir(cloudPath)
 	if err != nil {
 		return
 	}

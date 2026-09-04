@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
+	"path"
 	"sort"
 
 	"github.com/gowsp/cloud189/internal/session"
@@ -17,7 +19,7 @@ func init() {
 }
 
 type dirReader interface {
-	ReadDir(name string) ([]fs.DirEntry, error)
+	ReadDirContext(context.Context, string) ([]fs.DirEntry, error)
 }
 
 var lsCmd = &cobra.Command{
@@ -26,10 +28,6 @@ var lsCmd = &cobra.Command{
 	Short:  "列出文件",
 	Args:   cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := file.CheckPath(args...)
-		if err != nil {
-			return err
-		}
 		name := "/"
 		if session.Pwd() != "" {
 			name = session.Pwd()
@@ -38,15 +36,25 @@ var lsCmd = &cobra.Command{
 		} else if len(args) > 0 {
 			name = args[0]
 		}
-		client := App()
+		client, location, err := resolveCloudPath(name)
+		if err != nil {
+			return err
+		}
+		name = location.name()
+		if err := file.CheckPath(location.path); err != nil {
+			return err
+		}
 		if jsonOutput {
-			entries, err := listJSONEntries(client, name, recursiveList)
+			entries, err := listJSONEntries(cmd.Context(), client, name, recursiveList)
 			if err != nil {
 				return err
 			}
+			for i := range entries {
+				entries[i].Path = location.display(entries[i].Path)
+			}
 			return writeJSON(entries)
 		}
-		files, err := client.ReadDir(name)
+		files, err := client.ReadDirContext(cmd.Context(), name)
 		if err != nil {
 			return err
 		}
@@ -59,8 +67,9 @@ var lsCmd = &cobra.Command{
 	},
 }
 
-func listJSONEntries(client dirReader, root string, recursive bool) ([]JSONFileEntry, error) {
-	entries, err := listJSONEntriesFrom(client, cleanCloudPath(root), cleanCloudPath(root), recursive)
+func listJSONEntries(ctx context.Context, client dirReader, root string, recursive bool) ([]JSONFileEntry, error) {
+	rootPath := cleanCloudPath(root)
+	entries, err := listJSONEntriesFrom(ctx, client, root, rootPath, rootPath, recursive)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +79,8 @@ func listJSONEntries(client dirReader, root string, recursive bool) ([]JSONFileE
 	return entries, nil
 }
 
-func listJSONEntriesFrom(client dirReader, current, base string, recursive bool) ([]JSONFileEntry, error) {
-	files, err := client.ReadDir(current)
+func listJSONEntriesFrom(ctx context.Context, client dirReader, currentName, currentPath, base string, recursive bool) ([]JSONFileEntry, error) {
+	files, err := client.ReadDirContext(ctx, currentName)
 	if err != nil {
 		return nil, err
 	}
@@ -81,9 +90,10 @@ func listJSONEntriesFrom(client dirReader, current, base string, recursive bool)
 		if err != nil {
 			return nil, err
 		}
-		entryPath := joinCloudPath(current, info.Name())
+		entryName := path.Join(currentName, info.Name())
+		entryPath := joinCloudPath(currentPath, info.Name())
 		if recursive && info.IsDir() {
-			childEntries, err := listJSONEntriesFrom(client, entryPath, base, recursive)
+			childEntries, err := listJSONEntriesFrom(ctx, client, entryName, entryPath, base, recursive)
 			if err != nil {
 				return nil, err
 			}

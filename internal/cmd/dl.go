@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"errors"
-	"log"
+	"fmt"
 
 	"github.com/gowsp/cloud189/internal/session"
 	"github.com/gowsp/cloud189/pkg/file"
@@ -25,18 +25,22 @@ var dlCmd = &cobra.Command{
 				return cobra.ExactArgs(1)(cmd, args)
 			}
 			session.Parse(cmd, args)
-			if err := file.CheckPath(args[0]); err != nil {
+			client, location, err := resolveCloudPath(args[0])
+			if err != nil {
+				return err
+			}
+			if err := file.CheckPath(location.path); err != nil {
 				return err
 			}
 			if dlOutput == "" {
 				return errors.New("--output is required in machine mode")
 			}
-			info, err := App().DownloadTo(dlOutput, args[0])
+			info, err := downloadFile(cmd.Context(), client, location.name(), dlOutput)
 			if err != nil {
 				return err
 			}
 			if jsonOutput {
-				return writeJSON(fileToJSONEntry(args[0], info))
+				return writeJSON(fileToJSONEntry(location.display(location.path), info))
 			}
 			return nil
 		}
@@ -46,14 +50,26 @@ var dlCmd = &cobra.Command{
 		}
 		clouds := args[:length-1]
 		session.Parse(cmd, clouds)
-		err := file.CheckPath(clouds...)
-		if err != nil {
-			return err
-		}
 		local := args[length-1]
-		if err := App().Download(local, clouds...); err != nil {
-			log.Println(err)
-		}
-		return nil
+		return collectDownloadErrors(clouds, func(cloud string) error {
+			client, location, err := resolveCloudPath(cloud)
+			if err != nil {
+				return err
+			}
+			if err := file.CheckPath(location.path); err != nil {
+				return err
+			}
+			return downloadTree(cmd.Context(), client, location.name(), local)
+		})
 	},
+}
+
+func collectDownloadErrors(clouds []string, download func(string) error) error {
+	var errs []error
+	for _, cloud := range clouds {
+		if err := download(cloud); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", cloud, err))
+		}
+	}
+	return errors.Join(errs...)
 }

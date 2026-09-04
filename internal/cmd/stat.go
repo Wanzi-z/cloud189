@@ -23,10 +23,14 @@ var statCmd = &cobra.Command{
 		if len(args) > 0 {
 			name = args[0]
 		}
-		if err := file.CheckPath(name); err != nil {
+		client, location, err := resolveCloudPath(name)
+		if err != nil {
 			return err
 		}
-		info, err := App().Stat(name)
+		if err := file.CheckPath(location.path); err != nil {
+			return err
+		}
+		info, err := client.StatContext(cmd.Context(), location.name())
 		if err != nil {
 			if jsonOutput && errors.Is(err, fs.ErrNotExist) {
 				return writeJSON(nil)
@@ -34,7 +38,7 @@ var statCmd = &cobra.Command{
 			return err
 		}
 		if jsonOutput {
-			return writeJSON(fileToJSONEntry(name, info))
+			return writeJSON(fileToJSONEntry(location.display(location.path), info))
 		}
 		fmt.Println(file.ReadableFileInfo(info))
 		return nil

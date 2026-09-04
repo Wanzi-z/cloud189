@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gowsp/cloud189/pkg/invoker"
+	"github.com/gowsp/cloud189/internal/invoker"
 	"github.com/peterh/liner"
 	"github.com/spf13/cobra"
 )
@@ -42,11 +42,12 @@ func logout() error {
 		err = nil
 	}
 	if err == nil {
+		resetApp()
 		fmt.Println("退出登录成功")
 	}
 	return err
 }
 
 func init() {
-	logoutCmd.Flags().BoolVarP(&confirm, "f", "f", false, "直接退出，不确认")
+	logoutCmd.Flags().BoolVarP(&confirm, "force", "y", false, "直接退出，不确认")
 }

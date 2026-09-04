@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"io/fs"
 	"sort"
 	"testing"
@@ -17,21 +18,21 @@ func (d testDirEntry) Info() (fs.FileInfo, error) { return d.info, nil }
 
 type testDirReader map[string][]fs.DirEntry
 
-func (r testDirReader) ReadDir(name string) ([]fs.DirEntry, error) {
+func (r testDirReader) ReadDirContext(_ context.Context, name string) ([]fs.DirEntry, error) {
 	return r[name], nil
 }
 
 func TestListJSONEntriesRecursiveFilesOnly(t *testing.T) {
 	reader := testDirReader{
-		"/我的文档": {
+		"我的文档": {
 			testDirEntry{info: testFileInfo{name: "b.txt", size: 2, id: "2", pid: "root"}},
 			testDirEntry{info: testFileInfo{name: "dir", dir: true, id: "dir", pid: "root"}},
 		},
-		"/我的文档/dir": {
+		"我的文档/dir": {
 			testDirEntry{info: testFileInfo{name: "a.txt", size: 1, id: "1", pid: "dir"}},
 		},
 	}
-	entries, err := listJSONEntries(reader, "/我的文档", true)
+	entries, err := listJSONEntries(context.Background(), reader, "我的文档", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,11 +57,11 @@ func TestListJSONEntriesRecursiveFilesOnly(t *testing.T) {
 
 func TestListJSONEntriesNonRecursiveIncludesDirectories(t *testing.T) {
 	reader := testDirReader{
-		"/我的文档": {
+		"我的文档": {
 			testDirEntry{info: testFileInfo{name: "dir", dir: true, id: "dir", pid: "root"}},
 		},
 	}
-	entries, err := listJSONEntries(reader, "/我的文档", false)
+	entries, err := listJSONEntries(context.Background(), reader, "我的文档", false)
 	if err != nil {
 		t.Fatal(err)
 	}

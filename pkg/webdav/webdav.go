@@ -1,22 +1,20 @@
 package webdav
 
 import (
-	"errors"
 	"net/http"
 
-	"github.com/gowsp/cloud189/pkg"
+	"github.com/gowsp/cloud189/pkg/drive"
 	"golang.org/x/net/webdav"
 )
 
-var errInvalidIfHeader = errors.New("webdav: invalid If header")
+func NewFileSystem(client *drive.FS) webdav.FileSystem {
+	return &fileSystem{app: client}
+}
 
-func Serve(addr string, client pkg.Drive) error {
-	fs := &CloudFileSystem{
-		app: client,
-	}
-	fs.handler = &webdav.Handler{
-		FileSystem: fs,
+func NewHandler(prefix string, client *drive.FS) http.Handler {
+	return &webdav.Handler{
+		Prefix:     prefix,
+		FileSystem: NewFileSystem(client),
 		LockSystem: webdav.NewMemLS(),
 	}
-	return http.ListenAndServe(addr, fs)
 }

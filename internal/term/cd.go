@@ -19,9 +19,15 @@ var cdCmd = &cobra.Command{
 			return
 		}
 		path := args[0]
-		stat, err := cmd.App().Stat(path)
+		drive, cloudPath, err := cmd.ResolveCloudPath(path)
+		if err != nil {
+			fmt.Printf("cd: %s: %s\n", path, err)
+			return
+		}
+		stat, err := drive.Stat(cloudPath)
 		if err == nil && stat.IsDir() {
-			session.SetWorkDir(path)
+			normalized, _ := cmd.NormalizeCloudPath(path)
+			session.SetWorkDir(normalized)
 			return
 		}
 		fmt.Printf("cd: %s: Not a directory\n", path)

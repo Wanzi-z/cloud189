@@ -1,65 +1,121 @@
 package webdav
 
 import (
+	"context"
+	"errors"
+	"io"
 	"io/fs"
-	"log"
 	"os"
-	"path/filepath"
 	"sync"
 
-	"github.com/gowsp/cloud189/pkg"
+	"github.com/gowsp/cloud189/pkg/drive"
 	"golang.org/x/net/webdav"
 )
 
-func newRead(app pkg.Drive, name string) (webdav.File, error) {
-	stat, err := app.Stat(name)
+func newRead(ctx context.Context, app *drive.FS, name string) (webdav.File, error) {
+	stat, err := app.StatContext(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	return &read{app: app, name: name, stat: stat.(pkg.File)}, nil
+	return &read{ctx: ctx, app: app, name: name, stat: stat.(drive.Entry)}, nil
 }
-
-var empty = &read{}
 
 type read struct {
-	app  pkg.Drive
-	name string
-	stat pkg.File
-	load sync.Once
-	temp *os.File
+	ctx     context.Context
+	app     *drive.FS
+	name    string
+	stat    drive.Entry
+	load    sync.Once
+	temp    *os.File
+	err     error
+	entries []fs.FileInfo
+	offset  int
 }
 
-func (r *read) getTemp() *os.File {
+func (r *read) getTemp() (*os.File, error) {
 	r.load.Do(func() {
-		dir, name := filepath.Split(r.name)
-		tempDir := os.TempDir() + "/cloud189" + dir
-		_, err := os.Stat(tempDir)
-		if os.IsNotExist(err) {
-			err := os.MkdirAll(tempDir, 0755)
-			if err != nil {
-				log.Println(err)
-				return
-			}
+		temp, err := os.CreateTemp("", "cloud189-webdav-read-*")
+		if err != nil {
+			r.err = err
+			return
 		}
-		r.app.Download(tempDir, r.name)
-		r.temp, _ = os.OpenFile(tempDir+"/"+name, os.O_CREATE|os.O_RDWR, 0644)
+		name := temp.Name()
+		if err := temp.Close(); err != nil {
+			r.err = err
+			_ = os.Remove(name)
+			return
+		}
+		destination, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC, 0600)
+		if err != nil {
+			r.err = err
+			_ = os.Remove(name)
+			return
+		}
+		_, downloadErr := r.app.Download(r.ctx, r.name, destination)
+		if err := errors.Join(downloadErr, destination.Close()); err != nil {
+			r.err = err
+			_ = os.Remove(name)
+			return
+		}
+		r.temp, r.err = os.OpenFile(name, os.O_RDWR, 0600)
 	})
-	return r.temp
+	return r.temp, r.err
 }
-func (r *read) Seek(offset int64, whence int) (int64, error) { return r.getTemp().Seek(offset, whence) }
-func (r *read) Read(p []byte) (n int, err error)             { return r.getTemp().Read(p) }
-func (r *read) Write(p []byte) (n int, err error)            { return r.getTemp().Write(p) }
-func (r *read) Close() error                                 { return nil }
-func (r *read) Readdir(count int) ([]fs.FileInfo, error) {
-	data, err := r.app.ReadDir(r.name)
+func (r *read) Seek(offset int64, whence int) (int64, error) {
+	temp, err := r.getTemp()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	files := make([]fs.FileInfo, len(data))
-	for i, v := range data {
-		files[i], _ = v.Info()
+	return temp.Seek(offset, whence)
+}
+func (r *read) Read(p []byte) (n int, err error) {
+	temp, err := r.getTemp()
+	if err != nil {
+		return 0, err
 	}
-	return files, err
+	return temp.Read(p)
+}
+func (r *read) Write(p []byte) (n int, err error) {
+	temp, err := r.getTemp()
+	if err != nil {
+		return 0, err
+	}
+	return temp.Write(p)
+}
+func (r *read) Close() error {
+	if r.temp == nil {
+		return r.err
+	}
+	return errors.Join(r.temp.Close(), os.Remove(r.temp.Name()))
+}
+func (r *read) Readdir(count int) ([]fs.FileInfo, error) {
+	if !r.stat.IsDir() {
+		return nil, &os.PathError{Op: "readdir", Path: r.name, Err: os.ErrInvalid}
+	}
+	if r.entries == nil {
+		data, err := r.app.ReadDirContext(r.ctx, r.name)
+		if err != nil {
+			return nil, err
+		}
+		r.entries = make([]fs.FileInfo, len(data))
+		for i, entry := range data {
+			info, err := entry.Info()
+			if err != nil {
+				return nil, err
+			}
+			r.entries[i] = info
+		}
+	}
+	if r.offset >= len(r.entries) && count > 0 {
+		return nil, io.EOF
+	}
+	end := len(r.entries)
+	if count > 0 && r.offset+count < end {
+		end = r.offset + count
+	}
+	files := r.entries[r.offset:end]
+	r.offset = end
+	return files, nil
 }
 func (r *read) Stat() (info fs.FileInfo, err error) {
 	return r.stat, err

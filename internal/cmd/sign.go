@@ -1,8 +1,8 @@
 package cmd
 
 import (
+	"github.com/gowsp/cloud189/internal/invoker"
 	"github.com/gowsp/cloud189/pkg/app"
-	"github.com/gowsp/cloud189/pkg/invoker"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +13,10 @@ var signCmd = &cobra.Command{
 		if cfgFile == "" {
 			cfgFile = invoker.DefaultPath()
 		}
-		app := app.New(cfgFile)
-		return app.Sign()
+		client, err := app.Open(cfgFile)
+		if err != nil {
+			return err
+		}
+		return client.Sign(cmd.Context())
 	},
 }

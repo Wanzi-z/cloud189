@@ -32,7 +32,9 @@ func Start() {
 		if args, err := line.Prompt(fmt.Sprintf("[cloud189 %s]$ ", session.Base())); err == nil {
 			root.SetArgs(strings.Split(args, " "))
 			cmd.ResetTermFlags()
-			if root.Execute() == liner.ErrPromptAborted {
+			err := root.Execute()
+			cmd.ResetTermFlags()
+			if err == liner.ErrPromptAborted {
 				break
 			}
 			line.AppendHistory(args)

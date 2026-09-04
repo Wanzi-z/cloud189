@@ -5,17 +5,17 @@ import (
 	"os"
 	"sync"
 
-	"github.com/gowsp/cloud189/pkg"
+	"github.com/gowsp/cloud189/internal/invoker"
 	"github.com/gowsp/cloud189/pkg/app"
 	"github.com/gowsp/cloud189/pkg/drive"
-	"github.com/gowsp/cloud189/pkg/invoker"
 	"github.com/spf13/cobra"
 )
 
 var (
-	cfgFile    string
-	jsonOutput bool
-	RootCmd    = &cobra.Command{
+	cfgFile        string
+	jsonOutput     bool
+	familySelector string
+	RootCmd        = &cobra.Command{
 		Use:           "cloud189",
 		Long:          "cloud189 是一个基于天翼云接口的命令行客户端。详情请访问 https://github.com/gowsp/cloud189",
 		SilenceUsage:  true,
@@ -33,6 +33,7 @@ func ResetTermFlags() {
 	dlOutput = ""
 	upInput = ""
 	upRemotePath = ""
+	familySelector = ""
 }
 
 func Execute() {
@@ -49,6 +50,7 @@ func Execute() {
 func init() {
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "指定配置文件路径（默认为 $HOME/.config/cloud189/config.json）")
 	RootCmd.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "以 JSON 格式输出结果")
+	RootCmd.PersistentFlags().StringVarP(&familySelector, "family", "f", "", "指定当前命令的默认家庭云 ID")
 
 	RootCmd.AddCommand(loginCmd)
 	RootCmd.AddCommand(qrLoginCmd)
@@ -66,18 +68,45 @@ func init() {
 	RootCmd.AddCommand(duCmd)
 	RootCmd.AddCommand(webdavCmd)
 	RootCmd.AddCommand(shareCmd)
+	RootCmd.AddCommand(familiesCmd)
 }
 
-var singleton pkg.Drive
-var once sync.Once
+var clients = make(map[string]*drive.FS)
+var clientsMu sync.Mutex
 
-func App() pkg.Drive {
-	once.Do(func() {
-		if cfgFile == "" {
-			cfgFile = invoker.DefaultPath()
+func App() (*drive.FS, error) {
+	return driveFor(cloudPath{familyID: familySelector, path: "/"})
+}
+
+func driveFor(location cloudPath) (*drive.FS, error) {
+	clientsMu.Lock()
+	defer clientsMu.Unlock()
+	if cfgFile == "" {
+		cfgFile = invoker.DefaultPath()
+	}
+	key := cfgFile + "\x00" + location.key()
+	if client := clients[key]; client != nil {
+		return client, nil
+	}
+	api, err := app.Open(cfgFile)
+	if err != nil {
+		return nil, err
+	}
+	var client *drive.FS
+	if location.familyID == "" {
+		client = api.Personal()
+	} else {
+		client, err = api.Family(RootCmd.Context(), location.familyID)
+		if err != nil {
+			return nil, err
 		}
-		api := app.New(cfgFile)
-		singleton = drive.New(api)
-	})
-	return singleton
+	}
+	clients[key] = client
+	return client, nil
+}
+
+func resetApp() {
+	clientsMu.Lock()
+	clients = make(map[string]*drive.FS)
+	clientsMu.Unlock()
 }

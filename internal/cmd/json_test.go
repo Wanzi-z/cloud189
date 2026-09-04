@@ -22,8 +22,8 @@ func (f testFileInfo) Mode() fs.FileMode  { return 0644 }
 func (f testFileInfo) ModTime() time.Time { return f.modTime }
 func (f testFileInfo) IsDir() bool        { return f.dir }
 func (f testFileInfo) Sys() any           { return nil }
-func (f testFileInfo) Id() string         { return f.id }
-func (f testFileInfo) PId() string        { return f.pid }
+func (f testFileInfo) ID() string         { return f.id }
+func (f testFileInfo) ParentID() string   { return f.pid }
 
 type testChecksumInfo struct {
 	testFileInfo

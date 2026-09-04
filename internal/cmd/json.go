@@ -54,11 +54,11 @@ func fileToJSONEntryWithBase(cloudPath, basePath string, info os.FileInfo) JSONF
 		Checksum:     checksumFromFileInfo(info),
 	}
 	if file, ok := info.(interface {
-		Id() string
-		PId() string
+		ID() string
+		ParentID() string
 	}); ok {
-		entry.FileID = file.Id()
-		entry.ParentFileID = file.PId()
+		entry.FileID = file.ID()
+		entry.ParentFileID = file.ParentID()
 	}
 	return entry
 }
@@ -83,6 +83,13 @@ func writeJSONTo(w io.Writer, v any) error {
 func cleanCloudPath(name string) string {
 	if name == "" {
 		return "/"
+	}
+	if separator := strings.IndexByte(name, ':'); separator > 0 {
+		prefix := name[:separator]
+		rest := name[separator+1:]
+		if isFamilyID(prefix) && path.IsAbs(rest) {
+			return prefix + ":" + path.Clean(rest)
+		}
 	}
 	if !path.IsAbs(name) {
 		name = "/" + name

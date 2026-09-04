@@ -3,15 +3,27 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/gowsp/cloud189/internal/session"
 	"github.com/gowsp/cloud189/pkg/file"
 	"github.com/spf13/cobra"
 )
 
 var dfCmd = &cobra.Command{
-	Use:   "df",
+	Use:   "df [path|familyID:]",
 	Short: "显示空间使用情况",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		space, err := App().Space()
+		name := "/"
+		if len(args) > 0 {
+			name = session.Join(args[0])
+		} else if session.Pwd() != "" {
+			name = session.Pwd()
+		}
+		client, _, err := resolveCloudPath(name)
+		if err != nil {
+			return err
+		}
+		space, err := client.Space(cmd.Context())
 		if err != nil {
 			return err
 		}
