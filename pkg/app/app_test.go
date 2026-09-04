@@ -1,78 +1,86 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/gowsp/cloud189/pkg"
-	"github.com/gowsp/cloud189/pkg/file"
-	"github.com/gowsp/cloud189/pkg/invoker"
+	"github.com/gowsp/cloud189/internal/invoker"
+	pkg "github.com/gowsp/cloud189/pkg/drive"
 )
+
+func testClient() *Client {
+	client, err := Open(invoker.DefaultPath())
+	if err != nil {
+		panic(err)
+	}
+	return client
+}
 
 func init() {
 	os.Setenv("189_MODE", "1")
 }
 func TestLogin(t *testing.T) {
-	New(invoker.DefaultPath()).PwdLogin("xxxxxxx", "xxxxxxxxxxx")
+	testClient().Login(context.Background(), "xxxxxxx", "xxxxxxxxxxx")
 }
 func TestQrLogin(t *testing.T) {
-	New(invoker.DefaultPath()).QrLogin()
+	testClient().QRLogin(context.Background())
 }
 func TestSpace(t *testing.T) {
-	space, _ := New(invoker.DefaultPath()).Space()
+	space, _ := testClient().space(context.Background())
 	fmt.Println(space.Available, space.Capacity)
 }
 func TestSign(t *testing.T) {
-	New(invoker.DefaultPath()).Sign()
+	testClient().Sign(context.Background())
 }
 func TestListFile(t *testing.T) {
-	f, _ := New(invoker.DefaultPath()).List(file.Root, pkg.FILE)
+	f, _ := testClient().listEntries(context.Background(), personalRoot, pkg.RegularFile)
 	fmt.Println(f)
 }
 func TestListDir(t *testing.T) {
-	f, _ := New(invoker.DefaultPath()).List(file.Root, pkg.DIR)
+	f, _ := testClient().listEntries(context.Background(), personalRoot, pkg.Directory)
 	fmt.Println(f)
 }
 func TestSearchFile(t *testing.T) {
-	f, _ := New(invoker.DefaultPath()).Search(file.Root, pkg.FILE, "1")
+	f, _ := testClient().searchEntries(context.Background(), personalRoot, pkg.RegularFile, "1")
 	fmt.Println(f)
 }
 func TestSearchDir(t *testing.T) {
-	f, _ := New(invoker.DefaultPath()).Search(file.Root, pkg.DIR, "我")
+	f, _ := testClient().searchEntries(context.Background(), personalRoot, pkg.Directory, "我")
 	fmt.Println(f)
 }
 func TestMkdir(t *testing.T) {
-	New(invoker.DefaultPath()).Mkdir(file.Root, "/demo/1/2/3")
+	testClient().mkdir(context.Background(), personalRoot, "/demo/1/2/3")
 }
 func TestDelete(t *testing.T) {
-	api := New(invoker.DefaultPath())
-	dir, _ := api.Search(file.Root, pkg.DIR, "demo")
-	api.Delete(dir...)
+	api := testClient()
+	dir, _ := api.searchEntries(context.Background(), personalRoot, pkg.Directory, "demo")
+	api.remove(context.Background(), dir...)
 }
 func TestCopy(t *testing.T) {
-	api := New(invoker.DefaultPath())
-	f, _ := api.Mkdir(file.Root, "/demo/1/2/3")
-	api.Copy(file.Root, f)
+	api := testClient()
+	f, _ := api.mkdir(context.Background(), personalRoot, "/demo/1/2/3")
+	api.copyEntries(context.Background(), personalRoot, f)
 }
 func TestRename(t *testing.T) {
-	api := New(invoker.DefaultPath())
-	demo, _ := api.Search(file.Root, pkg.DIR, "demo")
-	api.Rename(demo[0], "demo")
+	api := testClient()
+	demo, _ := api.searchEntries(context.Background(), personalRoot, pkg.Directory, "demo")
+	api.rename(context.Background(), demo[0], "demo")
 }
 func TestMove(t *testing.T) {
-	api := New(invoker.DefaultPath())
-	f, _ := api.Mkdir(file.Root, "/demo/1/2/3")
-	api.Move(file.Root, f)
+	api := testClient()
+	f, _ := api.mkdir(context.Background(), personalRoot, "/demo/1/2/3")
+	api.moveEntries(context.Background(), personalRoot, f)
 }
 func TestGetFolder(t *testing.T) {
-	api := New(invoker.DefaultPath())
-	f, _ := api.Stat("/demo/1/2/3")
+	api := testClient()
+	f, _ := api.stat(context.Background(), "/demo/1/2/3")
 	if f.IsDir() {
-		api.DirUsage(f)
+		api.usage(context.Background(), f)
 	}
 }
 func TestGetFile(t *testing.T) {
-	api := New(invoker.DefaultPath())
-	api.Stat("/我的图片")
+	api := testClient()
+	api.stat(context.Background(), "/我的图片")
 }

@@ -1,15 +1,17 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
 	"net/url"
 	"strconv"
 
-	"github.com/gowsp/cloud189/pkg"
+	pkg "github.com/gowsp/cloud189/pkg/drive"
 )
 
-func (d *api) List(parent pkg.File, fileType pkg.FileType) ([]pkg.File, error) {
-	id := parent.Id()
-	return d.list(id, strconv.Itoa(int(fileType)), 1)
+func (d *Client) listEntries(ctx context.Context, parent pkg.Entry, fileType pkg.FileType) ([]pkg.Entry, error) {
+	id := parent.ID()
+	return d.list(ctx, id, strconv.Itoa(int(fileType)), 1)
 }
 
 type listFileResp struct {
@@ -25,12 +27,12 @@ type listFileResp struct {
 	LastRev int64 `json:"lastRev"`
 }
 
-func (l *listFileResp) fill(id string) (data []pkg.File) {
+func (l *listFileResp) fill(id string) (data []pkg.Entry) {
 	if l == nil || l.Result.Count == 0 {
 		return
 	}
 	for _, f := range l.Result.Files {
-		f.ParentID = id
+		f.ParentFileID = json.Number(id)
 		data = append(data, f)
 	}
 	for _, f := range l.Result.Folders {
@@ -39,7 +41,7 @@ func (l *listFileResp) fill(id string) (data []pkg.File) {
 	return
 }
 
-func (c *api) list(id, fileType string, page int) (result []pkg.File, err error) {
+func (c *Client) list(ctx context.Context, id, fileType string, page int) (result []pkg.Entry, err error) {
 	params := make(url.Values)
 	params.Set("folderId", id)
 	params.Set("fileType", fileType)
@@ -52,14 +54,14 @@ func (c *api) list(id, fileType string, page int) (result []pkg.File, err error)
 	params.Set("pageSize", "100")
 
 	var resp listFileResp
-	err = c.invoker.Get("/listFiles.action", params, &resp)
+	err = c.invoker.GetContext(ctx, "/listFiles.action", params, &resp)
 	if err != nil {
 		return
 	}
 	result = append(result, resp.fill(id)...)
 	if 100*page < resp.Result.Count {
-		var more []pkg.File
-		more, err = c.list(id, fileType, page+1)
+		var more []pkg.Entry
+		more, err = c.list(ctx, id, fileType, page+1)
 		result = append(result, more...)
 	}
 	return

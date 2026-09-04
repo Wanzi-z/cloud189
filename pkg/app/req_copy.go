@@ -1,30 +1,30 @@
 package app
 
 import (
-	"log"
+	"context"
+	"errors"
+	"fmt"
 	"net/url"
 
-	"github.com/gowsp/cloud189/pkg"
-	"github.com/gowsp/cloud189/pkg/cache"
+	pkg "github.com/gowsp/cloud189/pkg/drive"
 )
 
-func (c *api) Copy(target pkg.File, files ...pkg.File) error {
-	var err error
+func (c *Client) copyEntries(ctx context.Context, target pkg.Entry, files ...pkg.Entry) error {
+	var errs []error
 	for _, v := range files {
-		err = c.copy(target, v)
+		err := c.copy(ctx, target, v)
 		if err != nil {
-			log.Println(err)
+			errs = append(errs, fmt.Errorf("copy %s: %w", v.Name(), err))
 		}
 	}
-	cache.InvalidId(target.Id())
-	return err
+	return errors.Join(errs...)
 }
 
-func (c *api) copy(targetFolderId pkg.File, src pkg.File) error {
+func (c *Client) copy(ctx context.Context, targetFolderId pkg.Entry, src pkg.Entry) error {
 	params := make(url.Values)
-	params.Set("fileId", src.Id())
+	params.Set("fileId", src.ID())
 	params.Set("destFileName", src.Name())
-	params.Set("destParentFolderId", targetFolderId.Id())
+	params.Set("destParentFolderId", targetFolderId.ID())
 	var result map[string]interface{}
-	return c.invoker.Post("/copyFile.action", params, &result)
+	return c.invoker.PostContext(ctx, "/copyFile.action", params, &result)
 }

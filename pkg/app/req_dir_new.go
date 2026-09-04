@@ -1,12 +1,13 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/url"
 	"path"
 
-	"github.com/gowsp/cloud189/pkg"
+	pkg "github.com/gowsp/cloud189/pkg/drive"
 )
 
 type makeDirResp struct {
@@ -44,11 +45,11 @@ func (r *makeDirResp) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (c *api) Mkdir(parent pkg.File, name string) (pkg.File, error) {
+func (c *Client) mkdir(ctx context.Context, parent pkg.Entry, name string) (pkg.Entry, error) {
 	var result makeDirResp
 	dir, base := path.Split(name)
-	params := url.Values{"folderName": {base}, "relativePath": {dir}, "parentFolderId": {parent.Id()}}
-	err := c.invoker.Post("/createFolder.action", params, &result)
+	params := url.Values{"folderName": {base}, "relativePath": {dir}, "parentFolderId": {parent.ID()}}
+	err := c.invoker.PostContext(ctx, "/createFolder.action", params, &result)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,52 +9,56 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gowsp/cloud189/pkg/invoker"
-	"github.com/gowsp/cloud189/pkg/util"
+	"github.com/gowsp/cloud189/internal/invoker"
+	"github.com/gowsp/cloud189/internal/util"
 )
 
-type api struct {
+type Client struct {
 	invoker *invoker.Invoker
 	conf    *invoker.Config
 }
 
-func New(path string) *api {
-	conf, _ := invoker.OpenConfig(path)
-	api := &api{conf: conf}
-	api.invoker = invoker.NewInvoker("https://api.cloud.189.cn", api.refresh, conf)
-	api.invoker.SetPrepare(api.sign)
-	return api
+func Open(path string) (*Client, error) {
+	conf, err := invoker.OpenConfig(path)
+	if err != nil {
+		return nil, err
+	}
+	return newClient(conf), nil
 }
 
-func Mem(username, password string) *api {
+func New(username, password string) *Client {
 	conf := &invoker.Config{User: &invoker.User{Name: username, Password: password}}
-	api := &api{conf: conf}
-	api.invoker = invoker.NewInvoker("https://api.cloud.189.cn", api.refresh, conf)
-	api.invoker.SetPrepare(api.sign)
-	return api
+	return newClient(conf)
 }
 
-func (api *api) refresh() error {
+func newClient(conf *invoker.Config) *Client {
+	client := &Client{conf: conf}
+	client.invoker = invoker.NewInvoker("https://api.cloud.189.cn", client.refreshContext, conf)
+	client.invoker.SetPrepareE(client.sign)
+	return client
+}
+
+func (api *Client) refreshContext(ctx context.Context) error {
 	s := api.conf.Session
 	if s.Login() {
 		params := url.Values{}
 		params.Set("appId", "9317140619")
 		params.Set("accessToken", s.AccessToken)
 		var newSession invoker.Session
-		if err := api.invoker.Post("/getSessionForPC.action", params, &newSession); err != nil {
+		if err := api.invoker.PostContext(ctx, "/getSessionForPC.action", params, &newSession); err != nil {
 			return err
 		}
 		s.Merge(newSession)
 		return api.conf.Save()
 	}
 	user := api.conf.User
-	if user.Name == "" || user.Password == "" {
+	if user == nil || user.Name == "" || user.Password == "" {
 		return errors.New("扫码不支持自动重新登录")
 	}
-	return api.PwdLogin(api.conf.User.Name, api.conf.User.Password)
+	return api.Login(ctx, api.conf.User.Name, api.conf.User.Password)
 }
 
-func (api *api) sign(req *http.Request) {
+func (api *Client) sign(req *http.Request) error {
 	now := time.Now()
 	query := req.URL.Query()
 	// 填充客户端参数
@@ -62,22 +67,37 @@ func (api *api) sign(req *http.Request) {
 	query.Set("version", "7.1.8.0")
 	query.Set("channelId", "web_cloud.189.cn")
 	req.URL.RawQuery = query.Encode()
+	if req.URL.Path == "/getSessionForPC.action" {
+		return nil
+	}
 
 	// sha1(SessionKey=相应的值&Operate=相应值&RequestURI=相应值&Date=相应的值”, SessionSecret)
 	session := api.conf.Session
-	if session.Empty() {
-		return
+	if session == nil {
+		return errors.New("请先登录")
+	}
+	key, secret := session.Key, session.Secret
+	if invoker.RequestScope(req) == invoker.FamilyScope {
+		key, secret = session.FamilyKey, session.FamilySecret
+	}
+	if key == "" || secret == "" {
+		return errors.New("登录会话无效，请重新登录")
 	}
 	date := now.Format(time.RFC1123)
 	data := fmt.Sprintf("SessionKey=%s&Operate=%s&RequestURI=%s&Date=%s",
-		session.Key, req.Method, req.URL.Path, date)
+		key, req.Method, req.URL.Path, date)
 	// 追加上传参数
-	if req.Host == "upload.cloud.189.cn" {
-		data += "&params=" + query.Get("params")
+	params := invoker.RequestSignParams(req)
+	if req.Host == "upload.cloud.189.cn" || params != "" {
+		if params == "" {
+			params = query.Get("params")
+		}
+		data += "&params=" + params
 	}
 	req.Header.Set("Date", date)
 	req.Header.Set("user-agent", "desktop")
-	req.Header.Set("SessionKey", session.Key)
-	req.Header.Set("Signature", util.Sha1(data, session.Secret))
+	req.Header.Set("SessionKey", key)
+	req.Header.Set("Signature", util.Sha1(data, secret))
 	req.Header.Set("X-Request-ID", util.Random("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"))
+	return nil
 }

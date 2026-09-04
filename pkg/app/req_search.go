@@ -1,15 +1,16 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
 	"net/url"
 	"strconv"
 
-	"github.com/gowsp/cloud189/pkg"
-	"github.com/gowsp/cloud189/pkg/file"
+	pkg "github.com/gowsp/cloud189/pkg/drive"
 )
 
-func (d *api) Search(parent pkg.File, fileType pkg.FileType, name string) ([]pkg.File, error) {
-	return d.search(parent.Id(), strconv.Itoa(int(fileType)), name, 1)
+func (d *Client) searchEntries(ctx context.Context, parent pkg.Entry, fileType pkg.FileType, name string) ([]pkg.Entry, error) {
+	return d.search(ctx, parent.ID(), strconv.Itoa(int(fileType)), name, 1)
 }
 
 type searchResult struct {
@@ -20,12 +21,12 @@ type searchResult struct {
 	Folders []*folder   `json:"folderList"`
 }
 
-func (l *searchResult) fill(id string) (data []pkg.File) {
+func (l *searchResult) fill(id string) (data []pkg.Entry) {
 	if l == nil || l.Count == 0 {
 		return
 	}
 	for _, f := range l.Files {
-		f.ParentID = id
+		f.ParentFileID = json.Number(id)
 		data = append(data, f)
 	}
 	for _, f := range l.Folders {
@@ -34,9 +35,9 @@ func (l *searchResult) fill(id string) (data []pkg.File) {
 	return
 }
 
-func (c *api) search(id, fileType, name string, page int) (result []pkg.File, err error) {
-	if file.IsSystem(id, name) {
-		return c.List(file.Root, pkg.DIR)
+func (c *Client) search(ctx context.Context, id, fileType, name string, page int) (result []pkg.Entry, err error) {
+	if isSystemFolder(id, name) {
+		return c.listEntries(ctx, personalRoot, pkg.Directory)
 	}
 	params := make(url.Values)
 	params.Set("folderId", id)
@@ -51,14 +52,14 @@ func (c *api) search(id, fileType, name string, page int) (result []pkg.File, er
 	params.Set("pageNum", strconv.Itoa(page))
 	params.Set("pageSize", "100")
 	var files searchResult
-	err = c.invoker.Get("/searchFiles.action", params, &files)
+	err = c.invoker.GetContext(ctx, "/searchFiles.action", params, &files)
 	if err != nil {
 		return
 	}
 	result = append(result, files.fill(id)...)
 	if page*100 < files.Count {
-		var more []pkg.File
-		more, err = c.search(id, fileType, name, page+1)
+		var more []pkg.Entry
+		more, err = c.search(ctx, id, fileType, name, page+1)
 		result = append(result, more...)
 	}
 	return

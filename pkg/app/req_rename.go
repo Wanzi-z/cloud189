@@ -1,13 +1,14 @@
 package app
 
 import (
+	"context"
 	"net/url"
 	"os"
 
-	"github.com/gowsp/cloud189/pkg"
+	pkg "github.com/gowsp/cloud189/pkg/drive"
 )
 
-func (c *api) Rename(src pkg.File, dest string) (err error) {
+func (c *Client) rename(ctx context.Context, src pkg.Entry, dest string) (err error) {
 	if src == nil {
 		return os.ErrNotExist
 	}
@@ -15,23 +16,23 @@ func (c *api) Rename(src pkg.File, dest string) (err error) {
 		return nil
 	}
 	if src.IsDir() {
-		err = c.renameFoler(src.Id(), dest)
+		err = c.renameFoler(ctx, src.ID(), dest)
 	} else {
-		err = c.renameFile(src.Id(), dest)
+		err = c.renameFile(ctx, src.ID(), dest)
 	}
 	return
 }
-func (c *api) renameFile(id, dest string) error {
+func (c *Client) renameFile(ctx context.Context, id, dest string) error {
 	params := make(url.Values)
 	params.Set("fileId", id)
 	params.Set("destFileName", dest)
 	var f map[string]interface{}
-	return c.invoker.Post("/renameFile.action", params, &f)
+	return c.invoker.PostContext(ctx, "/renameFile.action", params, &f)
 }
-func (c *api) renameFoler(id, dest string) error {
+func (c *Client) renameFoler(ctx context.Context, id, dest string) error {
 	params := make(url.Values)
 	params.Set("folderId", id)
 	params.Set("destFolderName", dest)
 	var result map[string]interface{}
-	return c.invoker.Post("/renameFolder.action", params, &result)
+	return c.invoker.PostContext(ctx, "/renameFolder.action", params, &result)
 }

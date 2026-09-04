@@ -1,26 +1,27 @@
 package app
 
 import (
+	"context"
 	"net/url"
 	"strings"
 
-	"github.com/gowsp/cloud189/pkg"
+	pkg "github.com/gowsp/cloud189/pkg/drive"
 )
 
-func (c *api) Move(target pkg.File, sources ...pkg.File) error {
+func (c *Client) moveEntries(ctx context.Context, target pkg.Entry, sources ...pkg.Entry) error {
 	if len(sources) == 0 {
 		return nil
 	}
 	list := make([]string, len(sources))
 	for i, src := range sources {
-		list[i] = src.Id()
+		list[i] = src.ID()
 	}
-	return c.move(target.Id(), list)
+	return c.move(ctx, target.ID(), list)
 }
-func (c *api) move(dir string, source []string) error {
+func (c *Client) move(ctx context.Context, dir string, source []string) error {
 	params := make(url.Values)
 	params.Set("fileIdList", strings.Join(source, ";"))
 	params.Set("destParentFolderId", dir)
 	var f map[string]interface{}
-	return c.invoker.Post("/batchMoveFile.action", params, &f)
+	return c.invoker.PostContext(ctx, "/batchMoveFile.action", params, &f)
 }
