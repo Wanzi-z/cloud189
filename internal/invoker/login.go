@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gowsp/cloud189/pkg/util"
+	"github.com/gowsp/cloud189/internal/util"
 )
 
 type content struct {
@@ -152,12 +153,12 @@ type LoginResult struct {
 	SSON   string
 }
 
-func (i *Invoker) prepareLogin(link string, params url.Values, user *User) (result *content, err error) {
+func (i *Invoker) prepareLogin(ctx context.Context, link string, params url.Values, user *User) (result *content, err error) {
 	req, err := util.GetReq(link, params)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := i.http.Do(req)
+	resp, err := i.http.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +168,12 @@ func (i *Invoker) prepareLogin(link string, params url.Values, user *User) (resu
 	return content, nil
 }
 
-func (i *Invoker) PwdLogin(link string, params url.Values, user *User) (result *LoginResult, err error) {
-	content, err := i.prepareLogin(link, params, user)
+func (i *Invoker) PwdLogin(ctx context.Context, link string, params url.Values, user *User) (result *LoginResult, err error) {
+	content, err := i.prepareLogin(ctx, link, params, user)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := i.http.Do(content.pwdRequest())
+	resp, err := i.http.Do(content.pwdRequest().WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}

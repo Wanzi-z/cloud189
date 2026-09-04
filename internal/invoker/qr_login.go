@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -9,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gowsp/cloud189/pkg/util"
+	"github.com/gowsp/cloud189/internal/util"
 )
 
 type QrCodeReq struct {
@@ -25,8 +26,8 @@ type qrCodeState struct {
 	SSON        string
 }
 
-func (c *QrCodeReq) query(conf *appConf) qrCodeState {
-	req, _ := http.NewRequest(http.MethodPost, "https://open.e.189.cn/api/logbox/oauth2/qrcodeLoginState.do", nil)
+func (c *QrCodeReq) query(ctx context.Context, conf *appConf) qrCodeState {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://open.e.189.cn/api/logbox/oauth2/qrcodeLoginState.do", nil)
 	req.Header.Set("referer", c.content.Referer)
 	params := req.URL.Query()
 	params.Set("appId", conf.Data.AppKey)
@@ -54,29 +55,29 @@ func (c *QrCodeReq) query(conf *appConf) qrCodeState {
 	return status
 }
 
-func (i *Invoker) QrLogin(link string, params url.Values) (result *LoginResult, err error) {
-	content, err := i.prepareLogin(link, params, nil)
+func (i *Invoker) QrLogin(ctx context.Context, link string, params url.Values) (result *LoginResult, err error) {
+	content, err := i.prepareLogin(ctx, link, params, nil)
 	if err != nil {
 		return nil, err
 	}
 	config := content.getAppConf()
-	req, _ := http.NewRequest(http.MethodGet, "https://open.e.189.cn/api/logbox/oauth2/getUUID.do", nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://open.e.189.cn/api/logbox/oauth2/getUUID.do", nil)
 	param := req.URL.Query()
 	param.Set("appId", content.AppKey)
 	req.URL.RawQuery = param.Encode()
 	resp, _ := http.DefaultClient.Do(req)
-	var ctx QrCodeReq
-	ctx.content = content
-	json.NewDecoder(resp.Body).Decode(&ctx)
+	var qr QrCodeReq
+	qr.content = content
+	json.NewDecoder(resp.Body).Decode(&qr)
 	params = make(url.Values)
-	url, _ := url.PathUnescape(ctx.Encodeuuid)
+	url, _ := url.PathUnescape(qr.Encodeuuid)
 	params.Set("REQID", content.ReqId)
 	params.Set("uuid", url)
 	log.Printf("please open url in your browser to login:\nhttps://open.e.189.cn/api/logbox/oauth2/image.do?%s\n\n", params.Encode())
 	t := time.NewTicker(3 * time.Second)
 	var status qrCodeState
 	for {
-		status = ctx.query(config)
+		status = qr.query(ctx, config)
 		switch status.Status {
 		case -106:
 			log.Println("not scanned")
@@ -90,6 +91,11 @@ func (i *Invoker) QrLogin(link string, params url.Values) (result *LoginResult, 
 			t.Stop()
 			return nil, errors.New("unknown status")
 		}
-		<-t.C
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return nil, ctx.Err()
+		case <-t.C:
+		}
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/gowsp/cloud189/pkg/util"
+	"github.com/gowsp/cloud189/internal/util"
 )
 
 type User struct {

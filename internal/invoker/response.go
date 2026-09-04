@@ -47,6 +47,8 @@ type strCodeRsp struct {
 	StrMessage string `json:"msg"`
 	ResCode    string `json:"res_code"`
 	ResMessage string `json:"res_message"`
+	ErrorCode  string `json:"errorCode"`
+	ErrorMsg   string `json:"errorMsg"`
 }
 
 // 业务异常, 无需重试
@@ -64,11 +66,17 @@ func (r *strCodeRsp) Code() string {
 	if r.ResCode != "" {
 		return r.ResCode
 	}
+	if r.ErrorCode != "" {
+		return r.ErrorCode
+	}
 	return r.StrCode
 }
 func (r *strCodeRsp) Message() string {
 	if r.ResMessage != "" {
 		return r.ResMessage
+	}
+	if r.ErrorMsg != "" {
+		return r.ErrorMsg
 	}
 	return r.StrMessage
 }
