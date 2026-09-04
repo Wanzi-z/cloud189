@@ -3,53 +3,65 @@ package drive
 import (
 	"sync"
 	"time"
-
-	"github.com/gowsp/cloud189/pkg"
-	"github.com/gowsp/cloud189/pkg/file"
 )
 
-var nodes sync.Map
+type fileCache struct {
+	nodes sync.Map
+}
 
-func load(id string) *node {
-	if val, ok := nodes.Load(id); ok {
+func newFileCache(root Entry) *fileCache {
+	cache := new(fileCache)
+	cache.newNode(root)
+	return cache
+}
+
+func (c *fileCache) load(id string) *node {
+	if val, ok := c.nodes.Load(id); ok {
 		return val.(*node)
-	}
-	if id == file.Root.Id() {
-		return newNode(file.Root)
 	}
 	return nil
 }
 
-func newNode(file pkg.File) *node {
-	node := &node{info: file}
-	nodes.Store(file.Id(), node)
+func (c *fileCache) alias(id string, node *node) {
+	if id != "" && node != nil {
+		c.nodes.Store(id, node)
+	}
+}
+
+func (c *fileCache) newNode(file Entry) *node {
+	node := &node{info: file, cache: c}
+	c.nodes.Store(file.ID(), node)
 	return node
 }
 
 type node struct {
-	info   pkg.File
+	info   Entry
+	cache  *fileCache
 	node   sync.Map
+	mu     sync.RWMutex
 	exp    time.Time
 	loaded bool
 }
 
-func (n *node) invalid() {
-	n.loaded = false
-}
+func (n *node) invalid() { n.mu.Lock(); n.loaded = false; n.mu.Unlock() }
 func (n *node) valid() bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
 	return n.loaded && n.exp.After(time.Now())
 }
 func (n *node) enable() {
-	n.exp = time.Now().Add(time.Minute * 1)
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.exp = time.Now().Add(time.Minute)
 	n.loaded = true
 }
-func (n *node) add(children ...pkg.File) {
+func (n *node) add(children ...Entry) {
 	for _, child := range children {
-		node := newNode(child)
+		node := n.cache.newNode(child)
 		n.node.Store(child.Name(), node)
 	}
 }
-func (n *node) search(name string, loader func() (pkg.File, error)) (pkg.File, error) {
+func (n *node) search(name string, loader func() (Entry, error)) (Entry, error) {
 	if val, ok := n.node.Load(name); ok {
 		return val.(*node).info, nil
 	}
@@ -61,9 +73,9 @@ func (n *node) search(name string, loader func() (pkg.File, error)) (pkg.File, e
 	return result, nil
 }
 
-func (n *node) list(loader func() ([]pkg.File, error)) ([]pkg.File, error) {
+func (n *node) list(loader func() ([]Entry, error)) ([]Entry, error) {
 	if n.valid() {
-		result := make([]pkg.File, 0)
+		result := make([]Entry, 0)
 		n.node.Range(func(key, value any) bool {
 			result = append(result, value.(*node).info)
 			return true
@@ -74,32 +86,36 @@ func (n *node) list(loader func() ([]pkg.File, error)) ([]pkg.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	n.node.Range(func(key, value any) bool {
+		n.node.Delete(key)
+		return true
+	})
 	n.add(result...)
 	n.enable()
 	return result, nil
 }
 
-func (n *node) delete(child pkg.File) {
-	p := load(child.Id())
+func (n *node) delete(child Entry) {
+	p := n.cache.load(child.ID())
 	if child.IsDir() && p != nil {
 		p.node.Range(func(key, value any) bool {
 			p.delete(value.(*node).info)
 			return true
 		})
 	}
-	nodes.Delete(child.Id())
+	n.cache.nodes.Delete(child.ID())
 	n.node.Delete(child.Name())
-	n.loaded = false
+	n.invalid()
 }
-func invalid(files ...pkg.File) {
+
+func (c *fileCache) invalid(files ...Entry) {
 	for _, file := range files {
 		if file == nil {
 			continue
 		}
-		node := load(file.PId())
-		if node == nil {
-			continue
+		node := c.load(file.ParentID())
+		if node != nil {
+			node.delete(file)
 		}
-		node.delete(file)
 	}
 }

@@ -1,72 +1,96 @@
 package drive
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
-	"path/filepath"
+	"path"
 )
 
-func (f *FS) Move(target string, source ...string) error {
-	if len(source) == 1 {
-		return f.singleMove(target, source[0])
-	}
-	return f.multiMove(target, source...)
+func (f *FS) Rename(ctx context.Context, oldName, newName string) error {
+	return f.move(ctx, newName, oldName)
 }
 
-func (f *FS) singleMove(target string, sources string) error {
-	files := f.resolve(sources)
-	if len(files) == 0 {
-		return fs.ErrNotExist
+func (f *FS) move(ctx context.Context, target string, source ...string) error {
+	if err := validNames("move", append([]string{target}, source...)...); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(source) == 1 {
+		return f.singleMove(ctx, target, source[0])
+	}
+	return f.multiMove(ctx, target, source...)
+}
+
+func (f *FS) singleMove(ctx context.Context, target string, sources string) error {
+	if path.Clean(target) == path.Clean(sources) {
+		return nil
+	}
+	files, err := f.resolveContext(ctx, sources)
+	if err != nil {
+		return err
 	}
 	source := files[0]
-	dest, err := f.stat(target)
+	dest, err := f.statContext(ctx, target)
 	defer func() {
-		invalid(source, dest)
+		f.cache.invalid(source, dest)
 	}()
 	if err == nil {
-		if dest.IsDir() {
-			return f.api.Move(dest, files...)
-		}
-		f.api.Delete(dest)
-		if source.PId() == dest.PId() {
-			return f.api.Rename(source, dest.Name())
-		} else {
-			f.api.Move(dest, files...)
-			return f.api.Rename(source, dest.Name())
-		}
+		return pathError("rename", target, fs.ErrExist)
 	}
 	if errors.Is(err, fs.ErrNotExist) {
-		dir, name := filepath.Split(target)
-		parent, err := f.stat(dir)
+		dir, name := parentName(target)
+		parent, err := f.statContext(ctx, dir)
 		if err != nil {
 			return err
 		}
-		if err := f.api.Move(parent, source); err != nil {
+		if source.Name() != name && source.ParentID() != parent.ID() {
+			collision, collisionErr := f.statContext(ctx, path.Join(dir, source.Name()))
+			if collisionErr == nil && collision.ID() != source.ID() {
+				oldName := source.Name()
+				if err := f.backend.Rename(ctx, source, name); err != nil {
+					return err
+				}
+				if err := f.backend.Move(ctx, parent, source); err != nil {
+					_ = f.backend.Rename(ctx, source, oldName)
+					return err
+				}
+				return nil
+			}
+			if collisionErr != nil && !errors.Is(collisionErr, fs.ErrNotExist) {
+				return collisionErr
+			}
+		}
+		if err := f.backend.Move(ctx, parent, source); err != nil {
 			return err
 		}
 		if source.Name() == name {
 			return nil
 		}
-		return f.api.Rename(source, name)
+		return f.backend.Rename(ctx, source, name)
 	}
 	return err
 }
-func (f *FS) multiMove(target string, source ...string) error {
-	dest, err := f.stat(target)
+func (f *FS) multiMove(ctx context.Context, target string, source ...string) error {
+	dest, err := f.statContext(ctx, target)
 	if err != nil {
 		return err
 	}
 	if !dest.IsDir() {
 		return fmt.Errorf("target '%s' is not a directory", target)
 	}
-	files := f.resolve(source...)
-	defer func() {
-		load(dest.Id()).invalid()
-		invalid(files...)
-	}()
-	if len(files) == 0 {
-		return nil
+	files, err := f.resolveContext(ctx, source...)
+	if err != nil {
+		return err
 	}
-	return f.api.Move(dest, files...)
+	defer func() {
+		if node := f.cache.load(dest.ID()); node != nil {
+			node.invalid()
+		}
+		f.cache.invalid(files...)
+	}()
+	return f.backend.Move(ctx, dest, files...)
 }
