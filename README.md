@@ -46,8 +46,20 @@
   - `pwd` 查看当前目录
   - `exit` 退出终端模式
 
-## TODO
+## 测试
 
-计划于未来更新如下一些内容：
+默认测试全部使用内存实现或 `httptest`，不会访问真实云盘：
 
-- [ ] webdav优化
+```bash
+go test ./...
+```
+
+真实云盘生命周期测试需要显式启用；测试使用唯一目录，并在正常结束和 `t.Cleanup` 中重复清理、验证目录不存在：
+
+```bash
+CLOUD189_INTEGRATION=1 \
+CLOUD189_INTEGRATION_FAMILY={家庭ID} \
+go test -tags=integration ./pkg/app -run TestCloudLifecycle
+```
+
+`CLOUD189_INTEGRATION_FAMILY` 为空时只测试个人云。签到测试还需额外设置 `CLOUD189_INTEGRATION_SIGN=1`。
