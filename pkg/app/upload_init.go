@@ -29,7 +29,7 @@ type uploadProfile struct {
 
 var personalUpload = uploadProfile{
 	scope: invoker.PersonalScope, prefix: "/person",
-	initMethod: http.MethodGet, commitMethod: http.MethodGet,
+	initMethod: http.MethodPost, commitMethod: http.MethodPost,
 }
 
 var familyUpload = uploadProfile{
@@ -70,7 +70,7 @@ func (u *uploader) Write(source pkg.Source) error {
 		return errors.New("upload source is nil")
 	}
 	if u.profile.scope == invoker.PersonalScope {
-		if err := u.api.invoker.GetContext(u.ctx, "/keepUserSession.action", nil, new(any)); err != nil {
+		if err := u.api.invoker.GetContext(u.ctx, "/keepUserSession.action", nil, new(any)); err != nil && !errors.Is(err, io.EOF) {
 			return err
 		}
 	}
