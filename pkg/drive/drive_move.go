@@ -47,7 +47,15 @@ func (f *FS) singleMove(ctx context.Context, target string, sources string) erro
 		if err != nil {
 			return err
 		}
-		if source.Name() != name && source.ParentID() != parent.ID() {
+		// Same-directory rename: backend rename only. A batch MOVE into the
+		// source's own directory is rejected by the server as a name conflict.
+		if source.ParentID() == parent.ID() {
+			if source.Name() == name {
+				return nil
+			}
+			return f.backend.Rename(ctx, source, name)
+		}
+		if source.Name() != name {
 			collision, collisionErr := f.statContext(ctx, path.Join(dir, source.Name()))
 			if collisionErr == nil && collision.ID() != source.ID() {
 				oldName := source.Name()
