@@ -113,6 +113,12 @@ func (b *davBackend) Copy(_ context.Context, target drive.Entry, entries ...driv
 	}
 	return nil
 }
+func (b *davBackend) CopyWithOptions(ctx context.Context, target drive.Entry, _ drive.ConflictPolicy, entries ...drive.Entry) error {
+	return b.Copy(ctx, target, entries...)
+}
+func (b *davBackend) MoveWithOptions(ctx context.Context, target drive.Entry, _ drive.ConflictPolicy, entries ...drive.Entry) error {
+	return b.Move(ctx, target, entries...)
+}
 
 func TestFileSystemUsesWebDAVPaths(t *testing.T) {
 	adapter := NewFileSystem(drive.New(newDAVBackend()))

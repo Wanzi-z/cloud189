@@ -92,7 +92,7 @@ func (b *personalBackend) Move(ctx context.Context, target drive.Entry, entries 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return b.client.moveEntries(ctx, target, entries...)
+	return b.client.Move(ctx, target, entries...)
 }
 func (b *familyBackend) Move(ctx context.Context, target drive.Entry, entries ...drive.Entry) error {
 	if err := ctx.Err(); err != nil {
@@ -101,22 +101,40 @@ func (b *familyBackend) Move(ctx context.Context, target drive.Entry, entries ..
 	return b.family.Move(ctx, target, entries...)
 }
 func (b *personalBackend) Copy(ctx context.Context, target drive.Entry, entries ...drive.Entry) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return b.client.copyEntries(ctx, target, entries...)
+	return b.CopyWithOptions(ctx, target, drive.ConflictError, entries...)
 }
 func (b *familyBackend) Copy(ctx context.Context, target drive.Entry, entries ...drive.Entry) error {
+	return b.CopyWithOptions(ctx, target, drive.ConflictError, entries...)
+}
+func (b *personalBackend) CopyWithOptions(ctx context.Context, target drive.Entry, policy drive.ConflictPolicy, entries ...drive.Entry) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return b.family.Copy(ctx, target, entries...)
+	return b.client.CopyPolicy(ctx, policy, target, entries...)
+}
+func (b *familyBackend) CopyWithOptions(ctx context.Context, target drive.Entry, policy drive.ConflictPolicy, entries ...drive.Entry) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return b.family.CopyPolicy(ctx, policy, target, entries...)
+}
+func (b *personalBackend) MoveWithOptions(ctx context.Context, target drive.Entry, policy drive.ConflictPolicy, entries ...drive.Entry) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return b.client.MovePolicy(ctx, policy, target, entries...)
+}
+func (b *familyBackend) MoveWithOptions(ctx context.Context, target drive.Entry, policy drive.ConflictPolicy, entries ...drive.Entry) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return b.family.MovePolicy(ctx, policy, target, entries...)
 }
 func (b *personalBackend) Remove(ctx context.Context, entries ...drive.Entry) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return b.client.remove(ctx, entries...)
+	return b.client.Remove(ctx, entries...)
 }
 func (b *familyBackend) Remove(ctx context.Context, entries ...drive.Entry) error {
 	if err := ctx.Err(); err != nil {

@@ -37,6 +37,20 @@ type PutOptions struct {
 	Overwrite bool
 }
 
+// ConflictPolicy controls duplicate-name resolution for copy and move.
+type ConflictPolicy int
+
+const (
+	// ConflictError fails the operation when duplicates are detected.
+	ConflictError ConflictPolicy = iota
+	// ConflictSkip keeps the existing target file and skips the source.
+	ConflictSkip
+	// ConflictKeepBoth keeps both files; the incoming copy is auto-renamed.
+	ConflictKeepBoth
+	// ConflictOverwrite replaces the existing target file.
+	ConflictOverwrite
+)
+
 type Digest struct {
 	MD5      string
 	SliceMD5 string
@@ -50,6 +64,8 @@ type Backend interface {
 	Rename(context.Context, Entry, string) error
 	Move(context.Context, Entry, ...Entry) error
 	Copy(context.Context, Entry, ...Entry) error
+	MoveWithOptions(context.Context, Entry, ConflictPolicy, ...Entry) error
+	CopyWithOptions(context.Context, Entry, ConflictPolicy, ...Entry) error
 	Remove(context.Context, ...Entry) error
 	Space(context.Context) (Space, error)
 	Usage(context.Context, Entry) (Usage, error)

@@ -73,6 +73,11 @@ func (f *FS) Mkdir(ctx context.Context, name string, perm fs.FileMode) error {
 }
 
 func (f *FS) Copy(ctx context.Context, target string, source ...string) error {
+	return f.CopyOptions(ctx, ConflictError, target, source...)
+}
+
+// CopyOptions copies sources into target with a duplicate-name policy.
+func (f *FS) CopyOptions(ctx context.Context, policy ConflictPolicy, target string, source ...string) error {
 	if err := validNames("copy", append([]string{target}, source...)...); err != nil {
 		return err
 	}
@@ -93,14 +98,14 @@ func (f *FS) Copy(ctx context.Context, target string, source ...string) error {
 		}
 		f.cache.invalid(src...)
 	}()
-	return f.backend.Copy(ctx, dest, src...)
+	return f.backend.CopyWithOptions(ctx, dest, policy, src...)
 }
 
 func (f *FS) RemoveAll(ctx context.Context, name string) error {
-	return f.remove(ctx, name)
+	return f.Remove(ctx, name)
 }
 
-func (f *FS) remove(ctx context.Context, name ...string) error {
+func (f *FS) Remove(ctx context.Context, name ...string) error {
 	if err := validNames("delete", name...); err != nil {
 		return err
 	}

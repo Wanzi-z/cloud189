@@ -278,10 +278,10 @@ func (f *familyAPI) DirUsage(ctx context.Context, target pkg.Entry) (pkg.Usage, 
 		if err := f.base.invoker.GetScopedContext(ctx, invoker.FamilyScope, "/file/queryTaskResult.action", query, &response); err != nil {
 			return pkg.Usage{}, err
 		}
-		switch response.TaskStatus {
-		case 4:
+		switch {
+		case response.TaskStatus == taskDone:
 			return pkg.Usage{Files: response.FileCountNum, Directories: response.FolderCountNum, Bytes: response.FileSizeNum}, nil
-		case 3:
+		case taskPending(response.TaskStatus):
 			select {
 			case <-ctx.Done():
 				return pkg.Usage{}, ctx.Err()

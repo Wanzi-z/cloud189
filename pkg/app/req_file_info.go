@@ -14,9 +14,11 @@ import (
 )
 
 func (c *Client) detail(ctx context.Context, id string) (string, error) {
-	var info map[string]string
+	var info struct {
+		URL string `json:"fileDownloadUrl"`
+	}
 	err := c.invoker.GetContext(ctx, "/getFileDownloadUrl.action", url.Values{"fileId": {id}}, &info)
-	return info["fileDownloadUrl"], err
+	return info.URL, err
 }
 
 func (c *Client) download(ctx context.Context, file pkg.Entry, start int64) (*http.Response, error) {
@@ -138,11 +140,11 @@ func (c *Client) usage(ctx context.Context, file pkg.Entry) (pkg.Usage, error) {
 			return pkg.Usage{}, err
 		}
 		// 如果任务完成则返回结果
-		if rsp.TaskStatus == 4 {
+		if rsp.TaskStatus == taskDone {
 			return pkg.Usage{Files: rsp.FileCountNum, Directories: rsp.FolderCountNum, Bytes: rsp.FileSizeNum}, nil
 		}
 		// 如果不是状态3（进行中），则返回错误
-		if rsp.TaskStatus != 3 {
+		if !taskPending(rsp.TaskStatus) {
 			return pkg.Usage{}, fmt.Errorf("unexpected task status: %d", rsp.TaskStatus)
 		}
 		// 等待1.5秒再重试

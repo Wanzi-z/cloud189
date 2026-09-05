@@ -499,14 +499,17 @@ func TestPersonalUploadProfile(t *testing.T) {
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
-		if r.Method != http.MethodGet {
-			t.Errorf("method=%s", r.Method)
+		if r.URL.Path != "/keepUserSession.action" && r.Method != http.MethodPost {
+			t.Errorf("method=%s path=%s", r.Method, r.URL.Path)
 		}
 		if r.URL.Path == "/keepUserSession.action" {
 			_, _ = io.WriteString(w, `{}`)
 			return
 		}
-		params := decryptUploadParams(t, r.URL.Query().Get("params"), "personal-secret-0123456789")
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		params := decryptUploadParams(t, r.Form.Get("params"), "personal-secret-0123456789")
 		switch r.URL.Path {
 		case "/person/initMultiUpload":
 			if params.Get("parentFolderId") != "-11" || params.Get("familyId") != "" {
@@ -578,12 +581,122 @@ func TestZeroUploadReturnsInitializationError(t *testing.T) {
 	}
 }
 
+func TestBatchConflictResolutionProtocol(t *testing.T) {
+	for _, policy := range []struct {
+		name    string
+		policy  ConflictPolicy
+		dealWay int
+	}{
+		{name: "skip", policy: ConflictSkip, dealWay: 1},
+		{name: "keep both", policy: ConflictKeepBoth, dealWay: 2},
+		{name: "overwrite", policy: ConflictOverwrite, dealWay: 3},
+	} {
+		t.Run(policy.name, func(t *testing.T) {
+			var paths []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				paths = append(paths, r.URL.Path)
+				if err := r.ParseForm(); err != nil {
+					t.Fatal(err)
+				}
+				switch r.URL.Path {
+				case "/batch/createBatchTask.action":
+					_, _ = io.WriteString(w, `{"res_code":0,"taskId":"conflict-task"}`)
+				case "/batch/checkBatchTask.action":
+					if len(paths) == 2 {
+						_, _ = io.WriteString(w, `{"res_code":0,"taskStatus":2,"subTaskCount":1,"successedCount":0}`)
+						return
+					}
+					_, _ = io.WriteString(w, `{"res_code":0,"taskStatus":4,"subTaskCount":1,"successedCount":1}`)
+				case "/batch/getConflictTaskInfo.action":
+					_, _ = io.WriteString(w, `{"res_code":0,"taskId":"conflict-task","taskInfos":[{"fileId":"7","fileName":"a.txt","isFolder":0}]}`)
+				case "/batch/manageBatchTask.action":
+					taskInfos := r.Form.Get("taskInfos")
+					want := fmt.Sprintf(`"dealWay":%d`, policy.dealWay)
+					if !strings.Contains(taskInfos, want) {
+						t.Errorf("manage taskInfos=%s, want %s", taskInfos, want)
+					}
+					_, _ = io.WriteString(w, `{"res_code":0,"success":true}`)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+			client := newTestFamilyAPI(t, server.URL).base
+			batch := client.personalBatch()
+			batch.conflict = policy.policy
+			target := &folder{FileID: "10", DirName: "target"}
+			source := &fileInfo{FileID: "7", ParentFileID: json.Number("8"), FileName: "a.txt"}
+			if err := batch.run(context.Background(), "COPY", targetID(target), source); err != nil {
+				t.Fatal(err)
+			}
+			want := "/batch/createBatchTask.action,/batch/checkBatchTask.action,/batch/getConflictTaskInfo.action,/batch/manageBatchTask.action,/batch/checkBatchTask.action"
+			if got := strings.Join(paths, ","); got != want {
+				t.Fatalf("paths=%s", got)
+			}
+		})
+	}
+}
+
+func TestBatchConflictErrorPolicyKeepsError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/batch/createBatchTask.action":
+			_, _ = io.WriteString(w, `{"res_code":0,"taskId":"task"}`)
+		case "/batch/checkBatchTask.action":
+			_, _ = io.WriteString(w, `{"res_code":0,"taskStatus":2,"subTaskCount":1,"successedCount":0}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := newTestFamilyAPI(t, server.URL).base
+	target := &folder{FileID: "10", DirName: "target"}
+	source := &fileInfo{FileID: "7", ParentFileID: json.Number("8"), FileName: "a.txt"}
+	if err := client.Copy(context.Background(), target, source); err == nil || !strings.Contains(err.Error(), "同名文件") {
+		t.Fatalf("error=%v", err)
+	}
+}
+
 func TestFamilyMoveWithinSameDirectoryIsNoop(t *testing.T) {
 	family := newTestFamilyAPI(t, "http://127.0.0.1:1")
 	target := &folder{FileID: json.Number("8"), DirName: "dir"}
 	source := &fileInfo{FileID: json.Number("7"), ParentFileID: json.Number("8"), FileName: "a.txt"}
 	if err := family.Move(context.Background(), target, source); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFamilyTaskStates(t *testing.T) {
+	for _, status := range []int{taskQueued, taskRunning} {
+		if !taskPending(status) {
+			t.Fatalf("status %d should be pending", status)
+		}
+	}
+	for _, status := range []int{0, taskConflict, taskDone, 5} {
+		if taskPending(status) {
+			t.Fatalf("status %d should not be pending", status)
+		}
+	}
+}
+
+func TestFamilyTaskResult(t *testing.T) {
+	tests := []struct {
+		name    string
+		result  batchTaskResponse
+		wantErr bool
+	}{
+		{name: "complete", result: batchTaskResponse{SubTaskCount: 3, SucceededCount: 3}},
+		{name: "failed", result: batchTaskResponse{SubTaskCount: 3, SucceededCount: 2, FailedCount: 1}, wantErr: true},
+		{name: "skipped", result: batchTaskResponse{SubTaskCount: 3, SucceededCount: 2, SkipCount: 1}, wantErr: true},
+		{name: "incomplete", result: batchTaskResponse{SubTaskCount: 3, SucceededCount: 2}, wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.result.resultError()
+			if (err != nil) != test.wantErr {
+				t.Fatalf("error=%v wantErr=%v", err, test.wantErr)
+			}
+		})
 	}
 }
 

@@ -33,7 +33,11 @@ func (f *memoryFile) Sys() any                   { return nil }
 func (f *memoryFile) Type() fs.FileMode          { return f.Mode().Type() }
 func (f *memoryFile) Info() (fs.FileInfo, error) { return f, nil }
 
-type memoryBackend struct{ files map[string]*memoryFile }
+type memoryBackend struct {
+	files       map[string]*memoryFile
+	removeCalls int
+	removed     int
+}
 
 func newMemoryBackend() *memoryBackend {
 	return &memoryBackend{files: map[string]*memoryFile{
@@ -64,7 +68,15 @@ func (b *memoryBackend) Rename(_ context.Context, entry Entry, name string) erro
 }
 func (*memoryBackend) Move(context.Context, Entry, ...Entry) error { return nil }
 func (*memoryBackend) Copy(context.Context, Entry, ...Entry) error { return fs.ErrPermission }
+func (*memoryBackend) MoveWithOptions(ctx context.Context, t Entry, _ ConflictPolicy, s ...Entry) error {
+	return nil
+}
+func (*memoryBackend) CopyWithOptions(ctx context.Context, t Entry, _ ConflictPolicy, s ...Entry) error {
+	return fs.ErrPermission
+}
 func (b *memoryBackend) Remove(_ context.Context, entries ...Entry) error {
+	b.removeCalls++
+	b.removed = len(entries)
 	for key, candidate := range b.files {
 		for _, entry := range entries {
 			if candidate == entry {
@@ -73,6 +85,17 @@ func (b *memoryBackend) Remove(_ context.Context, entries ...Entry) error {
 		}
 	}
 	return nil
+}
+
+func TestBatchRemoveUsesSingleBackendCall(t *testing.T) {
+	backend := newMemoryBackend()
+	client := New(backend)
+	if err := client.Remove(context.Background(), "hello.txt", "dir/nested.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if backend.removeCalls != 1 || backend.removed != 2 {
+		t.Fatalf("remove calls=%d entries=%d", backend.removeCalls, backend.removed)
+	}
 }
 func (b *memoryBackend) Put(_ context.Context, parent Entry, name string, reader io.Reader, size int64, options PutOptions) error {
 	data, err := io.ReadAll(reader)
